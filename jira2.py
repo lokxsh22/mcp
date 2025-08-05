@@ -208,19 +208,27 @@ def list_tmp_files() -> dict:
 def main():
     """Entry point for the MCP server."""
     import sys
+    import uvicorn
+    from mcp.server.sse import SseServerTransport
     
     # Check if running with stdio transport (for local development)
     if len(sys.argv) > 1 and sys.argv[1] == "stdio":
         logger.info("Starting Jira MCP server with stdio transport")
         mcp.run(transport="stdio")
     else:
-        # Use SSE transport for web deployment
-        # Note: FastMCP handles port configuration internally for SSE
-        logger.info("Starting Jira MCP server with SSE transport")
+        # Use SSE transport for web deployment with proper host/port binding
+        port = int(os.getenv("PORT", 8000))
+        logger.info(f"Starting Jira MCP server with SSE transport on port {port}")
         logger.info(f"Jira URL: {JIRA_URL}")
         logger.info(f"Username: {JIRA_USERNAME}")
         logger.info(f"Project Key: {PROJECT_KEY}")
-        mcp.run(transport="sse")
+        
+        # Create SSE transport manually to control host/port
+        sse = SseServerTransport("/messages")
+        app = sse.create_app(mcp)
+        
+        # Run with uvicorn on all interfaces
+        uvicorn.run(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     main()
