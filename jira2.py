@@ -209,20 +209,18 @@ def main():
     """Entry point for the MCP server."""
     import sys
     
-    # For web deployment, use SSE transport with a specific port
-    port = int(os.getenv("PORT", 8000))
-    
     # Check if running with stdio transport (for local development)
     if len(sys.argv) > 1 and sys.argv[1] == "stdio":
-        transport = "stdio"
-        mcp.run(transport=transport)
+        logger.info("Starting Jira MCP server with stdio transport")
+        mcp.run(transport="stdio")
     else:
         # Use SSE transport for web deployment
-        logger.info(f"Starting Jira MCP server with SSE transport on port {port}")
+        # Note: FastMCP handles port configuration internally for SSE
+        logger.info("Starting Jira MCP server with SSE transport")
         logger.info(f"Jira URL: {JIRA_URL}")
         logger.info(f"Username: {JIRA_USERNAME}")
         logger.info(f"Project Key: {PROJECT_KEY}")
-        mcp.run(transport="sse", port=port, host="0.0.0.0")
+        mcp.run(transport="sse")
 
 if __name__ == "__main__":
     main()
