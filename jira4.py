@@ -4,7 +4,7 @@ import os
 import requests
 from mcp.server.fastmcp import FastMCP
 
-# Set up logging
+# Set up logging 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
