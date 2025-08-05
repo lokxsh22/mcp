@@ -28,24 +28,23 @@ mcp = FastMCP("jira-mcp-server")
 @mcp.tool()
 def get_epic_name_field_id() -> str:
     """Retrieve the custom field ID for the Epic Name field in Jira."""
+    if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN:
+        logger.error("Jira configuration missing. Cannot fetch Epic Name field ID.")
+        return "Error: Jira configuration missing. Please set JIRA_URL, JIRA_USERNAME, and JIRA_API_TOKEN."
     url = f"{JIRA_URL}/rest/api/3/field"
     auth = (JIRA_USERNAME, JIRA_API_TOKEN)
     headers = {"Accept": "application/json"}
-    
     try:
         response = requests.get(url, auth=auth, headers=headers)
         response.raise_for_status()
         fields = response.json()
-        
         for field in fields:
             if field.get("name") == "Epic Name":
                 return field["id"]
-        
         return "customfield_10011"  # Fallback if not found
-        
     except requests.RequestException as e:
         logger.error(f"Error fetching Epic Name field ID: {str(e)}")
-        raise Exception(f"Failed to fetch Epic Name field ID: {str(e)}")
+        return f"Error: Failed to fetch Epic Name field ID: {str(e)}"
 
 @mcp.tool()
 def get_project_info() -> dict:
@@ -54,15 +53,16 @@ def get_project_info() -> dict:
     Returns:
         Dictionary containing project details
     """
+    if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
+        logger.error("Jira configuration missing. Cannot fetch project info.")
+        return {"error": "Jira configuration missing. Please set JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY."}
     url = f"{JIRA_URL}/rest/api/3/project/{PROJECT_KEY}"
     auth = (JIRA_USERNAME, JIRA_API_TOKEN)
     headers = {"Accept": "application/json"}
-    
     try:
         response = requests.get(url, auth=auth, headers=headers)
         response.raise_for_status()
         project = response.json()
-        
         return {
             "project_key": PROJECT_KEY,
             "project_name": project.get("name"),
@@ -70,10 +70,9 @@ def get_project_info() -> dict:
             "project_type": project.get("projectTypeKey"),
             "description": project.get("description", "No description available")
         }
-        
     except requests.RequestException as e:
         logger.error(f"Error fetching project info for {PROJECT_KEY}: {str(e)}")
-        raise Exception(f"Failed to fetch project info: {str(e)}")
+        return {"error": f"Failed to fetch project info: {str(e)}"}
 
 @mcp.tool()
 def download_attachments(issue_key: str = None) -> dict:
@@ -85,60 +84,51 @@ def download_attachments(issue_key: str = None) -> dict:
     Returns:
         Dictionary containing list of downloaded file paths
     """
+    if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
+        logger.error("Jira configuration missing. Cannot download attachments.")
+        return {"error": "Jira configuration missing. Please set JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY."}
     # Use environment issue key if none provided
     if not issue_key:
         if not ISSUE_KEY:
-            raise Exception("No issue_key provided and ISSUE_KEY environment variable not set")
+            return {"error": "No issue_key provided and ISSUE_KEY environment variable not set."}
         issue_key = ISSUE_KEY
         logger.info(f"No issue_key provided, using environment ISSUE_KEY: {issue_key}")
-    
     # Validate that issue belongs to the configured project
     if not issue_key.startswith(f"{PROJECT_KEY}-"):
         logger.warning(f"Issue key {issue_key} does not belong to configured project {PROJECT_KEY}")
-    
     url = f"{JIRA_URL}/rest/api/3/issue/{issue_key}"
     auth = (JIRA_USERNAME, JIRA_API_TOKEN)
     headers = {"Accept": "application/json"}
-    
     try:
         response = requests.get(url, auth=auth, headers=headers)
         response.raise_for_status()
         issue = response.json()
-        
         attachments = issue.get("fields", {}).get("attachment", [])
         saved_files = []
-        
         # Create tmp directory if it doesn't exist
         os.makedirs("tmp", exist_ok=True)
-        
         if not attachments:
             logger.info(f"No attachments found for issue {issue_key}")
             return {"downloaded_files": [], "message": f"No attachments found for issue {issue_key}"}
-        
         for attachment in attachments:
             file_url = attachment["content"]
             file_name = attachment["filename"]
-            
             file_response = requests.get(file_url, auth=auth)
             file_response.raise_for_status()
-            
             file_path = os.path.join("tmp", file_name)
             with open(file_path, "wb") as f:
                 f.write(file_response.content)
-            
             saved_files.append(file_path)
             logger.debug(f"Downloaded attachment: {file_path}")
-        
         return {
             "downloaded_files": saved_files,
             "message": f"Successfully downloaded {len(saved_files)} attachments from issue {issue_key}",
             "issue_key": issue_key,
             "project_key": PROJECT_KEY
         }
-        
     except requests.RequestException as e:
         logger.error(f"Error downloading attachments for {issue_key}: {str(e)}")
-        raise Exception(f"Failed to download attachments: {str(e)}")
+        return {"error": f"Failed to download attachments: {str(e)}"}
 
 @mcp.tool()
 def upload_attachment(filename: str, issue_key: str = None) -> dict:
@@ -151,32 +141,30 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
     Returns:
         Dictionary containing uploaded filename
     """
+    if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
+        logger.error("Jira configuration missing. Cannot upload attachment.")
+        return {"error": "Jira configuration missing. Please set JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY."}
     # Use environment issue key if none provided
     if not issue_key:
         if not ISSUE_KEY:
-            raise Exception("No issue_key provided and ISSUE_KEY environment variable not set")
+            return {"error": "No issue_key provided and ISSUE_KEY environment variable not set."}
         issue_key = ISSUE_KEY
         logger.info(f"No issue_key provided, using environment ISSUE_KEY: {issue_key}")
-    
     # Validate that issue belongs to the configured project
     if not issue_key.startswith(f"{PROJECT_KEY}-"):
         logger.warning(f"Issue key {issue_key} does not belong to configured project {PROJECT_KEY}")
-    
     url = f"{JIRA_URL}/rest/api/3/issue/{issue_key}/attachments"
     auth = (JIRA_USERNAME, JIRA_API_TOKEN)
     headers = {"X-Atlassian-Token": "no-check"}
-    
     file_path = os.path.join("tmp", filename)
     if not os.path.exists(file_path):
         logger.error(f"File {file_path} not found")
-        raise Exception(f"File {filename} not found in tmp directory")
-    
+        return {"error": f"File {filename} not found in tmp directory"}
     try:
         with open(file_path, "rb") as f:
             files = {"file": (filename, f)}
             response = requests.post(url, auth=auth, headers=headers, files=files)
             response.raise_for_status()
-            
         logger.debug(f"Uploaded attachment: {filename} to {issue_key}")
         return {
             "uploaded_file": filename,
@@ -184,10 +172,9 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
             "issue_key": issue_key,
             "project_key": PROJECT_KEY
         }
-        
     except requests.RequestException as e:
         logger.error(f"Error uploading {filename} to {issue_key}: {str(e)}")
-        raise Exception(f"Failed to upload attachment: {str(e)}")
+        return {"error": f"Failed to upload attachment: {str(e)}"}
 
 @mcp.tool()
 def list_tmp_files() -> dict:
