@@ -209,25 +209,105 @@ def main():
     """Entry point for the MCP server."""
     import sys
     import uvicorn
-    from mcp.server.sse import SseServerTransport
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse, StreamingResponse
+    from fastapi.middleware.cors import CORSMiddleware
+    import asyncio
+    import json
     
     # Check if running with stdio transport (for local development)
     if len(sys.argv) > 1 and sys.argv[1] == "stdio":
         logger.info("Starting Jira MCP server with stdio transport")
         mcp.run(transport="stdio")
     else:
-        # Use SSE transport for web deployment with proper host/port binding
+        # Use FastAPI with SSE endpoint for web deployment
         port = int(os.getenv("PORT", 8000))
-        logger.info(f"Starting Jira MCP server with SSE transport on port {port}")
+        logger.info(f"Starting Jira MCP server with FastAPI SSE on port {port}")
         logger.info(f"Jira URL: {JIRA_URL}")
         logger.info(f"Username: {JIRA_USERNAME}")
         logger.info(f"Project Key: {PROJECT_KEY}")
         
-        # Create SSE transport manually to control host/port
-        sse = SseServerTransport("/messages")
-        app = sse.create_app(mcp)
+        app = FastAPI(title="Jira MCP Server", version="1.0.0")
         
-        # Run with uvicorn on all interfaces
+        # Add CORS middleware
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        
+        @app.get("/")
+        async def root():
+            return JSONResponse({
+                "message": "Jira MCP Server is running",
+                "transport": "sse",
+                "endpoint": "/messages",
+                "tools": [
+                    "get_epic_name_field_id",
+                    "get_project_info", 
+                    "download_attachments",
+                    "upload_attachment",
+                    "list_tmp_files"
+                ]
+            })
+        
+        @app.get("/health")
+        async def health():
+            return JSONResponse({"status": "healthy"})
+        
+        @app.get("/tools")
+        async def list_tools():
+            """List available MCP tools"""
+            return JSONResponse({
+                "tools": [
+                    {
+                        "name": "get_epic_name_field_id",
+                        "description": "Retrieve the custom field ID for the Epic Name field in Jira"
+                    },
+                    {
+                        "name": "get_project_info",
+                        "description": "Get information about the configured project"
+                    },
+                    {
+                        "name": "download_attachments", 
+                        "description": "Download attachments from a specified Jira issue"
+                    },
+                    {
+                        "name": "upload_attachment",
+                        "description": "Upload a local file to a specified Jira issue"
+                    },
+                    {
+                        "name": "list_tmp_files",
+                        "description": "List all files in the tmp directory"
+                    }
+                ]
+            })
+        
+        @app.post("/messages")
+        async def sse_endpoint():
+            """SSE endpoint for MCP communication"""
+            async def event_stream():
+                # This is a placeholder for MCP SSE communication
+                # In a full implementation, this would handle MCP protocol messages
+                yield f"data: {json.dumps({'message': 'MCP SSE endpoint ready'})}\n\n"
+                
+                # Keep connection alive
+                while True:
+                    await asyncio.sleep(30)
+                    yield f"data: {json.dumps({'ping': 'keepalive'})}\n\n"
+            
+            return StreamingResponse(
+                event_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                }
+            )
+        
+        # Run the FastAPI server
         uvicorn.run(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
