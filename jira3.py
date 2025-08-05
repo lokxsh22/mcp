@@ -15,14 +15,6 @@ JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 PROJECT_KEY = os.getenv("PROJECT_KEY")  # Now mandatory
 ISSUE_KEY = os.getenv("ISSUE_KEY")  # No default value
 
-# logger.debug(f"Loaded Jira config: jira_url={JIRA_URL}, username={JIRA_USERNAME}, project_key={PROJECT_KEY}, issue_key={ISSUE_KEY}")
-
-# # Validate that we have the required configuration
-# if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
-#     logger.error("Missing required Jira configuration")
-#     logger.error("Please ensure JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY are set in your MCP configuration")
-#     raise Exception("Missing required Jira configuration. Environment variables must be set via MCP client configuration.")
-
 # Create MCP server
 mcp = FastMCP("jira-mcp-server")
 
@@ -46,7 +38,6 @@ def get_epic_name_field_id() -> str:
         
     except requests.RequestException as e:
         logger.error(f"Error fetching Epic Name field ID: {str(e)}")
-        #raise Exception(f"Failed to fetch Epic Name field ID: {str(e)}")
 
 @mcp.tool()
 def get_project_info() -> dict:
@@ -74,7 +65,6 @@ def get_project_info() -> dict:
         
     except requests.RequestException as e:
         logger.error(f"Error fetching project info for {PROJECT_KEY}: {str(e)}")
-        #raise Exception(f"Failed to fetch project info: {str(e)}")
 
 @mcp.tool()
 def download_attachments(issue_key: str = None) -> dict:
@@ -90,7 +80,6 @@ def download_attachments(issue_key: str = None) -> dict:
     if not issue_key:
         if not ISSUE_KEY:
             logger.error("No issue_key provided and ISSUE_KEY environment variable not set")
-            #raise Exception("No issue_key provided and ISSUE_KEY environment variable not set")
         issue_key = ISSUE_KEY
         logger.info(f"No issue_key provided, using environment ISSUE_KEY: {issue_key}")
     
@@ -140,7 +129,6 @@ def download_attachments(issue_key: str = None) -> dict:
         
     except requests.RequestException as e:
         logger.error(f"Error downloading attachments for {issue_key}: {str(e)}")
-        #raise Exception(f"Failed to download attachments: {str(e)}")
 
 @mcp.tool()
 def upload_attachment(filename: str, issue_key: str = None) -> dict:
@@ -157,7 +145,6 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
     if not issue_key:
         if not ISSUE_KEY:
             logger.error("No issue_key provided and ISSUE_KEY environment variable not set")
-            #raise Exception("No issue_key provided and ISSUE_KEY environment variable not set")
         issue_key = ISSUE_KEY
         logger.info(f"No issue_key provided, using environment ISSUE_KEY: {issue_key}")
     
@@ -172,7 +159,6 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
     file_path = os.path.join("tmp", filename)
     if not os.path.exists(file_path):
         logger.error(f"File {file_path} not found")
-        #raise Exception(f"File {filename} not found in tmp directory")
     
     try:
         with open(file_path, "rb") as f:
@@ -190,7 +176,6 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
         
     except requests.RequestException as e:
         logger.error(f"Error uploading {filename} to {issue_key}: {str(e)}")
-        #raise Exception(f"Failed to upload attachment: {str(e)}")
 
 @mcp.tool()
 def list_tmp_files() -> dict:
@@ -212,37 +197,27 @@ def list_tmp_files() -> dict:
         }
     except Exception as e:
         logger.error(f"Error listing tmp files: {str(e)}")
-        #raise Exception(f"Failed to list tmp files: {str(e)}")
 
 def main():
     """Entry point for the MCP server."""
     import sys
     
-    # Check if running with stdio transport (for local development)
+    # Simple approach: Set environment variables and let MCP handle it
     if len(sys.argv) > 1 and sys.argv[1] == "stdio":
         transport = "stdio"
     else:
-        # For Render deployment, use SSE transport by default
         transport = "sse"
+        # Set environment variables for Render
+        port = int(os.getenv("PORT", 8000))
+        os.environ["UVICORN_HOST"] = "0.0.0.0"
+        os.environ["UVICORN_PORT"] = str(port)
     
     logger.info(f"Starting Jira MCP server with {transport} transport")
     logger.info(f"Jira URL: {JIRA_URL}")
     logger.info(f"Username: {JIRA_USERNAME}")
     logger.info(f"Project Key: {PROJECT_KEY}")
     
-    # For SSE transport on Render, configure port and host
-    if transport == "sse":
-        port = int(os.getenv("PORT", 8000))
-        logger.info(f"Using port: {port}")
-        # Try to configure MCP for Render deployment
-        try:
-            mcp.run(transport=transport, host="0.0.0.0", port=port)
-        except TypeError:
-            # If host/port parameters not supported, try with just transport
-            logger.info("Falling back to default SSE configuration")
-            mcp.run(transport=transport)
-    else:
-        mcp.run(transport=transport)
+    mcp.run(transport=transport)
 
 if __name__ == "__main__":
     main()
