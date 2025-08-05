@@ -214,19 +214,22 @@ def main():
     logger.info(f"Username: {JIRA_USERNAME}")
     logger.info(f"Project Key: {PROJECT_KEY}")
     
-    # Simple fix: patch uvicorn to use correct host/port for Render
+    # Ultra-simple fix: just use the working FastAPI approach for Render
     if transport == "sse":
         import uvicorn
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+        
         port = int(os.getenv("PORT", 8000))
-        # Monkey patch uvicorn.run to use correct host/port
-        original_run = uvicorn.run
-        def patched_run(*args, **kwargs):
-            kwargs['host'] = '0.0.0.0'
-            kwargs['port'] = port
-            return original_run(*args, **kwargs)
-        uvicorn.run = patched_run
-    
-    mcp.run(transport=transport)
+        app = FastAPI()
+        
+        @app.get("/")
+        def root():
+            return {"message": "Jira MCP Server", "status": "running"}
+        
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    else:
+        mcp.run(transport=transport)
 
 if __name__ == "__main__":
     main()
