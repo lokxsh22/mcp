@@ -1,2 +1,5 @@
+uv
 requests
 mcp
+uvicorn
+mcp-use
