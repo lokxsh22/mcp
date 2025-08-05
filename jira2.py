@@ -15,12 +15,12 @@ JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 PROJECT_KEY = os.getenv("PROJECT_KEY")  # Now mandatory
 ISSUE_KEY = os.getenv("ISSUE_KEY")  # No default value
 
-logger.debug(f"Loaded Jira config: jira_url={JIRA_URL}, username={JIRA_USERNAME}, project_key={PROJECT_KEY}, issue_key={ISSUE_KEY}")
+# logger.debug(f"Loaded Jira config: jira_url={JIRA_URL}, username={JIRA_USERNAME}, project_key={PROJECT_KEY}, issue_key={ISSUE_KEY}")
 
-# Validate that we have the required configuration
-if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
-    logger.error("Missing required Jira configuration")
-    logger.error("Please ensure JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY are set in your MCP configuration")
+# # Validate that we have the required configuration
+# if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
+#     logger.error("Missing required Jira configuration")
+#     logger.error("Please ensure JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY are set in your MCP configuration")
 
 # Create MCP server
 mcp = FastMCP("jira-mcp-server")
@@ -215,10 +215,10 @@ def main():
     else:
         transport = "stdio"
     
-    logger.info(f"Starting Jira MCP server with {transport} transport")
-    logger.info(f"Jira URL: {JIRA_URL}")
-    logger.info(f"Username: {JIRA_USERNAME}")
-    logger.info(f"Project Key: {PROJECT_KEY}")
+    # logger.info(f"Starting Jira MCP server with {transport} transport")
+    # logger.info(f"Jira URL: {JIRA_URL}")
+    # logger.info(f"Username: {JIRA_USERNAME}")
+    # logger.info(f"Project Key: {PROJECT_KEY}")
     mcp.run(transport=transport)
 
 if __name__ == "__main__":
