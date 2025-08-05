@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 # Set up logging 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) 
 
 # Load Jira credentials from environment variables (passed from jira.json)
 JIRA_URL = os.getenv("JIRA_URL")
