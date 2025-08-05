@@ -12,16 +12,15 @@ logger = logging.getLogger(__name__)
 JIRA_URL = os.getenv("JIRA_URL")
 JIRA_USERNAME = os.getenv("JIRA_USERNAME")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
-PROJECT_KEY = os.getenv("PROJECT_KEY")  # Now mandatory
-ISSUE_KEY = os.getenv("ISSUE_KEY")  # No default value
+PROJECT_KEY = os.getenv("PROJECT_KEY") 
+ISSUE_KEY = os.getenv("ISSUE_KEY") 
 
 logger.debug(f"Loaded Jira config: jira_url={JIRA_URL}, username={JIRA_USERNAME}, project_key={PROJECT_KEY}, issue_key={ISSUE_KEY}")
 
-# Validate that we have the required configuration
+# Validate that we have the required configuration, but do not raise exception on startup
 if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
-    logger.error("Missing required Jira configuration")
-    logger.error("Please ensure JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY are set in your MCP configuration")
-    raise Exception("Missing required Jira configuration. Environment variables must be set via MCP client configuration.")
+    logger.warning("Missing required Jira configuration. Some features may not work until environment variables are set.")
+    logger.warning("Please ensure JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY are set in your MCP configuration.")
 
 # Create MCP server
 mcp = FastMCP("jira-mcp-server")
