@@ -234,7 +234,7 @@ def main():
     logger.info(f"Project Key: {PROJECT_KEY}")
 
     if transport == "http":
-        mcp.run(transport="http", host=host, port=port)
+        mcp.run(transport="http")
     else:
         mcp.run(transport=transport)
 
