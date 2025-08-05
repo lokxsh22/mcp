@@ -12,14 +12,15 @@ logger = logging.getLogger(__name__)
 JIRA_URL = os.getenv("JIRA_URL")
 JIRA_USERNAME = os.getenv("JIRA_USERNAME")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
+PROJECT_KEY = os.getenv("PROJECT_KEY")  # Now mandatory
 ISSUE_KEY = os.getenv("ISSUE_KEY")  # No default value
 
-logger.debug(f"Loaded Jira config: jira_url={JIRA_URL}, username={JIRA_USERNAME}, issue_key={ISSUE_KEY}")
+logger.debug(f"Loaded Jira config: jira_url={JIRA_URL}, username={JIRA_USERNAME}, project_key={PROJECT_KEY}, issue_key={ISSUE_KEY}")
 
 # Validate that we have the required configuration
-if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN:
+if not JIRA_URL or not JIRA_USERNAME or not JIRA_API_TOKEN or not PROJECT_KEY:
     logger.error("Missing required Jira configuration")
-    logger.error("Please ensure JIRA_URL, JIRA_USERNAME, and JIRA_API_TOKEN are set in your MCP configuration")
+    logger.error("Please ensure JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, and PROJECT_KEY are set in your MCP configuration")
     raise Exception("Missing required Jira configuration. Environment variables must be set via MCP client configuration.")
 
 # Create MCP server
@@ -48,6 +49,34 @@ def get_epic_name_field_id() -> str:
         raise Exception(f"Failed to fetch Epic Name field ID: {str(e)}")
 
 @mcp.tool()
+def get_project_info() -> dict:
+    """Get information about the configured project.
+    
+    Returns:
+        Dictionary containing project details
+    """
+    url = f"{JIRA_URL}/rest/api/3/project/{PROJECT_KEY}"
+    auth = (JIRA_USERNAME, JIRA_API_TOKEN)
+    headers = {"Accept": "application/json"}
+    
+    try:
+        response = requests.get(url, auth=auth, headers=headers)
+        response.raise_for_status()
+        project = response.json()
+        
+        return {
+            "project_key": PROJECT_KEY,
+            "project_name": project.get("name"),
+            "project_id": project.get("id"),
+            "project_type": project.get("projectTypeKey"),
+            "description": project.get("description", "No description available")
+        }
+        
+    except requests.RequestException as e:
+        logger.error(f"Error fetching project info for {PROJECT_KEY}: {str(e)}")
+        raise Exception(f"Failed to fetch project info: {str(e)}")
+
+@mcp.tool()
 def download_attachments(issue_key: str = None) -> dict:
     """Download attachments from a specified Jira issue and save them locally.
     
@@ -63,6 +92,10 @@ def download_attachments(issue_key: str = None) -> dict:
             raise Exception("No issue_key provided and ISSUE_KEY environment variable not set")
         issue_key = ISSUE_KEY
         logger.info(f"No issue_key provided, using environment ISSUE_KEY: {issue_key}")
+    
+    # Validate that issue belongs to the configured project
+    if not issue_key.startswith(f"{PROJECT_KEY}-"):
+        logger.warning(f"Issue key {issue_key} does not belong to configured project {PROJECT_KEY}")
     
     url = f"{JIRA_URL}/rest/api/3/issue/{issue_key}"
     auth = (JIRA_USERNAME, JIRA_API_TOKEN)
@@ -100,7 +133,8 @@ def download_attachments(issue_key: str = None) -> dict:
         return {
             "downloaded_files": saved_files,
             "message": f"Successfully downloaded {len(saved_files)} attachments from issue {issue_key}",
-            "issue_key": issue_key
+            "issue_key": issue_key,
+            "project_key": PROJECT_KEY
         }
         
     except requests.RequestException as e:
@@ -125,6 +159,10 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
         issue_key = ISSUE_KEY
         logger.info(f"No issue_key provided, using environment ISSUE_KEY: {issue_key}")
     
+    # Validate that issue belongs to the configured project
+    if not issue_key.startswith(f"{PROJECT_KEY}-"):
+        logger.warning(f"Issue key {issue_key} does not belong to configured project {PROJECT_KEY}")
+    
     url = f"{JIRA_URL}/rest/api/3/issue/{issue_key}/attachments"
     auth = (JIRA_USERNAME, JIRA_API_TOKEN)
     headers = {"X-Atlassian-Token": "no-check"}
@@ -144,7 +182,8 @@ def upload_attachment(filename: str, issue_key: str = None) -> dict:
         return {
             "uploaded_file": filename,
             "message": f"Successfully uploaded {filename} to issue {issue_key}",
-            "issue_key": issue_key
+            "issue_key": issue_key,
+            "project_key": PROJECT_KEY
         }
         
     except requests.RequestException as e:
@@ -186,6 +225,7 @@ def main():
     logger.info(f"Starting Jira MCP server with {transport} transport")
     logger.info(f"Jira URL: {JIRA_URL}")
     logger.info(f"Username: {JIRA_USERNAME}")
+    logger.info(f"Project Key: {PROJECT_KEY}")
     mcp.run(transport=transport)
 
 if __name__ == "__main__":
