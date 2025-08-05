@@ -202,20 +202,29 @@ def main():
     """Entry point for the MCP server."""
     import sys
     
-    # Simple approach: Set environment variables and let MCP handle it
+    # Check if running with stdio transport (for local development)
     if len(sys.argv) > 1 and sys.argv[1] == "stdio":
         transport = "stdio"
     else:
+        # For Render deployment, use SSE transport
         transport = "sse"
-        # Set environment variables for Render
-        port = int(os.getenv("PORT", 8000))
-        os.environ["UVICORN_HOST"] = "0.0.0.0"
-        os.environ["UVICORN_PORT"] = str(port)
     
     logger.info(f"Starting Jira MCP server with {transport} transport")
     logger.info(f"Jira URL: {JIRA_URL}")
     logger.info(f"Username: {JIRA_USERNAME}")
     logger.info(f"Project Key: {PROJECT_KEY}")
+    
+    # Simple fix: patch uvicorn to use correct host/port for Render
+    if transport == "sse":
+        import uvicorn
+        port = int(os.getenv("PORT", 8000))
+        # Monkey patch uvicorn.run to use correct host/port
+        original_run = uvicorn.run
+        def patched_run(*args, **kwargs):
+            kwargs['host'] = '0.0.0.0'
+            kwargs['port'] = port
+            return original_run(*args, **kwargs)
+        uvicorn.run = patched_run
     
     mcp.run(transport=transport)
 
